@@ -37,7 +37,7 @@ static void handle_paint(struct window *data)
 	glClear(GL_COLOR_BUFFER_BIT);
 	ImGui::Render();
 	ImGui_ImplGL2_RenderDrawData(ImGui::GetDrawData());
-	Sleep(10);
+	Sleep(15); // Optional. Reduce CPU usage that shows up in the task manager. Should depend on your frame duration and refresh interval!
 	SwapBuffers(GetDC(data->hwnd));
 }
 
