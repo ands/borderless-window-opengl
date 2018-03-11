@@ -94,8 +94,8 @@ static void handle_compositionchanged(struct window *data)
 		MARGINS m = {0};
 		m.cyTopHeight = 1;
 		DwmExtendFrameIntoClientArea(data->hwnd, &m);
-		DWORD disabled = DWMNCRP_DISABLED;
-		DwmSetWindowAttribute(data->hwnd, DWMWA_NCRENDERING_POLICY, &disabled, sizeof(DWORD));
+		DWORD state = DWMNCRP_ENABLED;
+		DwmSetWindowAttribute(data->hwnd, DWMWA_NCRENDERING_POLICY, &state, sizeof(DWORD));
 	}
 
 	update_region(data);
