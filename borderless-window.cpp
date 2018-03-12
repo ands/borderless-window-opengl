@@ -187,8 +187,7 @@ static LRESULT handle_nchittest(struct window *data, int x, int y)
 
 	/* The horizontal frame should be the same size as the vertical frame,
 	   since the NONCLIENTMETRICS structure does not distinguish between them */
-	int frame_size = GetSystemMetrics(SM_CXFRAME) +
-	                 GetSystemMetrics(SM_CXPADDEDBORDER);
+	int frame_size = GetSystemMetrics(SM_CXFRAME); // + GetSystemMetrics(SM_CXPADDEDBORDER);
 	/* The diagonal size handles are wider than the frame */
 	int diagonal_width = frame_size * 2 + GetSystemMetrics(SM_CXBORDER);
 
