@@ -318,12 +318,16 @@ static LRESULT CALLBACK borderless_window_proc(HWND window, UINT msg, WPARAM wpa
 		if (!data->composition_enabled && !data->theme_enabled)
 			return handle_message_invisible(window, msg, wparam, lparam);
 		break;
+	case WM_SIZE:
+		data->minimized = wparam == SIZE_MINIMIZED;
+		data->maximized = wparam == SIZE_MAXIMIZED;
+		return 0;
 	case WM_THEMECHANGED:
 		handle_themechanged(data);
 		break;
 	case WM_WINDOWPOSCHANGED:
 		handle_windowposchanged(data, (WINDOWPOS*)lparam);
-		return 0;
+		return DefWindowProcW(window, msg, wparam, lparam); // Must be executed so that WM_SIZE and WM_MOVE get sent properly!
 	}
 
 	if (handle_message(data, msg, wparam, lparam))
@@ -406,7 +410,7 @@ int CALLBACK wWinMain(HINSTANCE /*inst*/, HINSTANCE /*prev*/, LPWSTR /*cmd*/, in
 {
 	WNDCLASSEXW wc = {0};
 	wc.cbSize = sizeof(WNDCLASSEXW);
-	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
 	wc.lpfnWndProc = borderless_window_proc;
 	wc.hInstance = HINST_THISCOMPONENT;
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);

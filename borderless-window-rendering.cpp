@@ -43,15 +43,22 @@ static void handle_paint(struct window *data)
 
 bool handle_message(struct window *data, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	// TODO: Handle double click for maximization!
-	// TODO: Get title bar dimensions from imgui for moving the window:
-	if (msg == WM_LBUTTONDOWN && HIWORD(lparam) < 18 && LOWORD(lparam) < data->width - 18)
+	// TODO: Get title bar dimensions from imgui:
+	if (HIWORD(lparam) < 19 && LOWORD(lparam) < data->width - 17)
 	{
-		ReleaseCapture();
-		SendMessageW(data->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0); // Allow window dragging from any point
-		return true;
+		if (msg == WM_LBUTTONDOWN) // drag window
+		{
+			SendMessageW(data->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+			return true;
+		}
+		
+		if (msg == WM_LBUTTONDBLCLK) // toggle maximize
+		{
+			ShowWindow(data->hwnd, data->maximized ? SW_RESTORE : SW_MAXIMIZE);
+			return true;
+		}
 	}
-	
+
 	if (msg == WM_PAINT)
 	{
 		handle_paint(data);

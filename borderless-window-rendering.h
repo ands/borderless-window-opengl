@@ -9,6 +9,8 @@ struct window
 
 	RECT rgn;
 
+	bool minimized;
+	bool maximized;
 	bool theme_enabled;
 	bool composition_enabled;
 };

@@ -294,6 +294,21 @@ bool ImGui_ImplGL2_Handle_Message(UINT msg, WPARAM wparam, LPARAM lparam)
 			ReleaseCapture();
 			return true;
 		} break;
+
+		case WM_LBUTTONDBLCLK:
+		case WM_MBUTTONDBLCLK:
+		case WM_RBUTTONDBLCLK:
+		{
+			int button = 0;
+			if (msg == WM_LBUTTONDBLCLK) button = 0;
+			if (msg == WM_RBUTTONDBLCLK) button = 1;
+			if (msg == WM_MBUTTONDBLCLK) button = 2;
+			
+			// Force a double click:
+			io.MouseDown[button] = true;
+			io.MouseClickedTime[button] = ImGui::GetTime();
+			return true;
+		} break;
 	}
 	return false;
 }
