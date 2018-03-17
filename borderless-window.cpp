@@ -18,16 +18,13 @@
 #include <versionhelpers.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include "borderless-window-rendering.h"
+#include "borderless-window.h"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "shell32.lib")
 #pragma comment(lib, "uxtheme.lib")
 #pragma comment(lib, "dwmapi.lib")
-#pragma comment(lib, "opengl32.lib")
-
-#define HINST_THISCOMPONENT GetModuleHandle(NULL)
 
 #ifndef WM_NCUAHDRAWCAPTION
 #define WM_NCUAHDRAWCAPTION (0x00AE)
@@ -329,102 +326,46 @@ static LRESULT CALLBACK borderless_window_proc(HWND window, UINT msg, WPARAM wpa
 		return DefWindowProcW(window, msg, wparam, lparam); // Must be executed so that WM_SIZE and WM_MOVE get sent properly!
 	}
 
-	if (handle_message(data, msg, wparam, lparam))
+	if (data->handler(data, msg, wparam, lparam))
 		return 0;
 
 	return DefWindowProcW(window, msg, wparam, lparam);
 }
 
-// We're just setting up some oldschool opengl context for testing here,
-// because setting up a modern opengl context is a PITA.
-HGLRC setup_opengl2(HWND window)
-{
-	HDC hdc = GetDC(window);
-	if (!hdc)
-	{
-		MessageBoxA(window, "GetDC failed", "ERROR", MB_OK);
-		return NULL;
-	}
-
-	static PIXELFORMATDESCRIPTOR pfd =
-	{
-		sizeof(PIXELFORMATDESCRIPTOR),
-		1,
-		PFD_DRAW_TO_WINDOW|PFD_SUPPORT_OPENGL|PFD_DOUBLEBUFFER,
-		PFD_TYPE_RGBA,
-		32,
-		0, 0, 0, 0, 0, 0, 8, 0,
-		0, 0, 0, 0, 0,  // accum
-		32,             // zbuffer
-		0,              // stencil!
-		0,              // aux
-		PFD_MAIN_PLANE,
-		0, 0, 0, 0
-	};
-
-	unsigned int pf = ChoosePixelFormat(hdc, &pfd);
-	if (!pf)
-	{
-		MessageBoxA(window, "ChoosePixelFormat failed", "ERROR", MB_OK);
-		return NULL;
-	}
-
-	if (!SetPixelFormat(hdc, pf, &pfd))
-	{
-		MessageBoxA(window, "SetPixelFormat failed", "ERROR", MB_OK);
-		return NULL;
-	}
-
-	HGLRC hglrc = wglCreateContext(hdc);
-	if (!hglrc)
-	{
-		MessageBoxA(window, "wglCreateContext failed", "ERROR", MB_OK);
-		return NULL;
-	}
-
-	if (!wglMakeCurrent(hdc, hglrc))
-	{
-		wglDeleteContext(hglrc);
-		MessageBoxA(window, "wglMakeCurrent failed", "ERROR", MB_OK);
-		return NULL;
-	}
-
-	return hglrc;
-}
-
-void shutdown_opengl2(HWND window, HGLRC hglrc)
-{
-	HDC hdc = GetDC(window);
-	if (!hdc)
-	{
-		MessageBoxA(window, "GetDC failed", "ERROR", MB_OK);
-		return;
-	}
-
-	wglMakeCurrent(hdc, NULL);
-	wglDeleteContext(hglrc);
-}
-
-int CALLBACK wWinMain(HINSTANCE /*inst*/, HINSTANCE /*prev*/, LPWSTR /*cmd*/, int /*show*/)
+void borderless_window_register()
 {
 	WNDCLASSEXW wc = {0};
 	wc.cbSize = sizeof(WNDCLASSEXW);
 	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
 	wc.lpfnWndProc = borderless_window_proc;
-	wc.hInstance = HINST_THISCOMPONENT;
+	wc.hInstance = GetModuleHandle(NULL);
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = NULL;
 	wc.lpszClassName = L"borderless-window";
-	ATOM cls = RegisterClassExW(&wc);
+	RegisterClassExW(&wc);
+}
 
+void borderless_window_unregister()
+{
+	UnregisterClassW(L"borderless-window", GetModuleHandle(NULL));
+}
+
+struct window* borderless_window_create(LPCWSTR title, int width, int height, message_handler handler, void* userdata)
+{
 	struct window *data = (struct window*)calloc(1, sizeof(struct window));
+
+	data->handler = handler;
+	data->userdata = userdata;
+
 	data->hwnd = CreateWindowExW(
 		WS_EX_APPWINDOW | WS_EX_LAYERED,
-		(LPWSTR)MAKEINTATOM(cls),
-		L"Borderless Window",
+		L"borderless-window",
+		title,
 		WS_OVERLAPPEDWINDOW | WS_SIZEBOX,
-		CW_USEDEFAULT, CW_USEDEFAULT, 1280, 960,
-		NULL, NULL, HINST_THISCOMPONENT, data);
+		CW_USEDEFAULT, CW_USEDEFAULT, width, height,
+		NULL, NULL, GetModuleHandle(NULL), data);
+	
+	data->hdc = GetDC(data->hwnd);
 
 	/* Make the window a layered window so the legacy GDI API can be used to
 	   draw to it without messing up the area on top of the DWM frame. Note:
@@ -437,25 +378,11 @@ int CALLBACK wWinMain(HINSTANCE /*inst*/, HINSTANCE /*prev*/, LPWSTR /*cmd*/, in
 	handle_compositionchanged(data);
 	handle_themechanged(data);
 
-	HGLRC hglrc = setup_opengl2(data->hwnd);
-	MSG message = {0};
-	if (hglrc)
-	{
-		handle_init(data);
+	return data;
+}
 
-		ShowWindow(data->hwnd, SW_SHOWDEFAULT);
-		UpdateWindow(data->hwnd);
-
-		while (GetMessageW(&message, NULL, 0, 0)) {
-			TranslateMessage(&message);
-			DispatchMessageW(&message);
-		}
-
-		handle_shutdown(data);
-		shutdown_opengl2(data->hwnd, hglrc);
-	}
-
+void borderless_window_destroy(struct window* data)
+{
+	DestroyWindow(data->hwnd);
 	free(data);
-	UnregisterClassW((LPWSTR)MAKEINTATOM(cls), HINST_THISCOMPONENT);
-	return (int)message.wParam;
 }

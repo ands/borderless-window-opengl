@@ -1,18 +1,25 @@
 #include <windows.h>
-#include <GL/gl.h>
-#include "borderless-window-rendering.h"
+#include "borderless-window.h"
+#include "opengl_context.h"
+#include "glad.h"
 #include "imgui.h"
-#include "imgui_impl_gl2.h"
+#include "imgui_impl_gl3.h"
 
-void handle_init(struct window *data)
+static HGLRC hglrc; // Global, shared between windows
+
+void init(struct window *data)
 {
-	ImGui::CreateContext();
-	ImGui_ImplGL2_Init(data->hwnd);
+	ImGui::SetCurrentContext((ImGuiContext*)(data->userdata = ImGui::CreateContext()));
+	ImGui_Impl_WinAPI_GL3_Init();
 	ImGui::StyleColorsDark();
-	
-	// Try to hide remaining 1px row of windows border in the corners
-	// which needs to be there to not get other artifacts :(
-	ImGui::GetStyle().WindowRounding = 0.0f;
+	ImGui::GetStyle().WindowRounding = 0.0f; // Try to hide remaining 1px row of windows border in the corners which needs to be there to not get other artifacts :(
+}
+
+void shutdown(struct window *data)
+{
+	ImGui::SetCurrentContext((ImGuiContext*)data->userdata);
+	ImGui_Impl_WinAPI_GL3_Shutdown();
+	ImGui::DestroyContext();
 }
 
 static void imgui(struct window *data)
@@ -28,48 +35,63 @@ static void imgui(struct window *data)
 	ImGui::End();
 }
 
-static void handle_paint(struct window *data)
+static void paint(struct window *data)
 {
-	ImGui_ImplGL2_NewFrame(data->width, data->height, data->width, data->height);
+	wglMakeCurrent(data->hdc, hglrc);
+	ImGui_Impl_WinAPI_GL3_NewFrame(data->hwnd, data->width, data->height, data->width, data->height);
 	imgui(data);
 	glViewport(0, 0, data->width, data->height);
 	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	ImGui::Render();
-	ImGui_ImplGL2_RenderDrawData(ImGui::GetDrawData());
-	Sleep(15); // Optional. Reduce CPU usage that shows up in the task manager. Should depend on your frame duration and refresh interval!
-	SwapBuffers(GetDC(data->hwnd));
+	ImGui_Impl_WinAPI_GL3_RenderDrawData(ImGui::GetDrawData());
+	SwapBuffers(data->hdc);
 }
 
 bool handle_message(struct window *data, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	// TODO: Get title bar dimensions from imgui:
-	if (HIWORD(lparam) < 19 && LOWORD(lparam) < data->width - 17)
+	ImGui::SetCurrentContext((ImGuiContext*)data->userdata);
+	if (HIWORD(lparam) < 19 && LOWORD(lparam) < data->width - 17) // TODO: Get title bar dimensions from imgui
 	{
-		if (msg == WM_LBUTTONDOWN) // drag window
-		{
-			SendMessageW(data->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-			return true;
-		}
-		
-		if (msg == WM_LBUTTONDBLCLK) // toggle maximize
-		{
-			ShowWindow(data->hwnd, data->maximized ? SW_RESTORE : SW_MAXIMIZE);
-			return true;
-		}
+		if (msg == WM_LBUTTONDOWN  ) { SendMessageW(data->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);           return true; } // Drag window
+		if (msg == WM_LBUTTONDBLCLK) { ShowWindow(data->hwnd, data->maximized ? SW_RESTORE : SW_MAXIMIZE); return true; } // Toggle maximize
 	}
-
-	if (msg == WM_PAINT)
-	{
-		handle_paint(data);
-		return true;
-	}
-	
-	return ImGui_ImplGL2_Handle_Message(msg, wparam, lparam);
+	if (msg == WM_PAINT) { paint(data); return true; }
+	return ImGui_Impl_WinAPI_GL3_Handle_Message(data->hwnd, msg, wparam, lparam);
 }
 
-void handle_shutdown(struct window * /*data*/)
+int CALLBACK wWinMain(HINSTANCE /*inst*/, HINSTANCE /*prev*/, LPWSTR /*cmd*/, int /*show*/)
 {
-	ImGui_ImplGL2_Shutdown();
-	ImGui::DestroyContext();
+	borderless_window_register();
+	struct window* window0 = borderless_window_create(L"Hello", 1280, 800, handle_message, NULL);
+	struct window* window1 = borderless_window_create(L"World", 640, 480, handle_message, NULL);
+
+	if (!(hglrc = opengl_create_context(window0->hdc)) || !opengl_set_pixelformat(window1->hdc))
+		ExitProcess(ERROR_INVALID_HANDLE);
+	gladLoadGL();
+
+	init(window0);
+	init(window1);
+
+	ShowWindow(window0->hwnd, SW_SHOWDEFAULT);
+	UpdateWindow(window0->hwnd);
+	ShowWindow(window1->hwnd, SW_SHOWDEFAULT);
+	UpdateWindow(window1->hwnd);
+	UpdateWindow(window0->hwnd); // Without this one window will show up with a windows border until one of them is moved!?
+
+	MSG message = {0};
+	while (GetMessageW(&message, NULL, 0, 0))
+	{
+		TranslateMessage(&message);
+		DispatchMessageW(&message);
+	}
+
+	shutdown(window0);
+	shutdown(window1);
+
+	opengl_destroy_context(hglrc);
+	borderless_window_destroy(window0);
+	borderless_window_destroy(window1);
+	borderless_window_unregister();
+	return (int)message.wParam;
 }
