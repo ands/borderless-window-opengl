@@ -33,69 +33,69 @@
 #define WM_NCUAHDRAWFRAME (0x00AF)
 #endif
 
-static void update_region(struct window *data)
+static void update_region(borderless_window_t *window)
 {
-	RECT old_rgn = data->rgn;
+	RECT old_rgn = window->rgn;
 	RECT r = {0};
 
-	if (IsMaximized(data->hwnd)) {
+	if (IsMaximized(window->hwnd)) {
 		WINDOWINFO wi = {};
 		wi.cbSize = sizeof(wi);
-		GetWindowInfo(data->hwnd, &wi);
+		GetWindowInfo(window->hwnd, &wi);
 
 		/* For maximized windows, a region is needed to cut off the non-client
 		   borders that hang over the edge of the screen */
-		data->rgn.left = wi.rcClient.left - wi.rcWindow.left;
-		data->rgn.top = wi.rcClient.top - wi.rcWindow.top;
-		data->rgn.right = wi.rcClient.right - wi.rcWindow.left;
-		data->rgn.bottom = wi.rcClient.bottom - wi.rcWindow.top;
-	} else if (!data->composition_enabled) {
+		window->rgn.left = wi.rcClient.left - wi.rcWindow.left;
+		window->rgn.top = wi.rcClient.top - wi.rcWindow.top;
+		window->rgn.right = wi.rcClient.right - wi.rcWindow.left;
+		window->rgn.bottom = wi.rcClient.bottom - wi.rcWindow.top;
+	} else if (!window->composition_enabled) {
 		/* For ordinary themed windows when composition is disabled, a region
 		   is needed to remove the rounded top corners. Make it as large as
 		   possible to avoid having to change it when the window is resized. */
-		data->rgn.left = 0;
-		data->rgn.top = 0;
-		data->rgn.right = 32767;
-		data->rgn.bottom = 32767;
+		window->rgn.left = 0;
+		window->rgn.top = 0;
+		window->rgn.right = 32767;
+		window->rgn.bottom = 32767;
 	} else {
 		/* Don't mess with the region when composition is enabled and the
 		   window is not maximized, otherwise it will lose its shadow */
-		data->rgn = r;
+		window->rgn = r;
 	}
 
 	/* Avoid unnecessarily updating the region to avoid unnecessary redraws */
-	if (EqualRect(&data->rgn, &old_rgn))
+	if (EqualRect(&window->rgn, &old_rgn))
 		return;
 	/* Treat empty regions as NULL regions */
-	if (EqualRect(&data->rgn, &r))
-		SetWindowRgn(data->hwnd, NULL, TRUE);
+	if (EqualRect(&window->rgn, &r))
+		SetWindowRgn(window->hwnd, NULL, TRUE);
 	else
-		SetWindowRgn(data->hwnd, CreateRectRgnIndirect(&data->rgn), TRUE);
+		SetWindowRgn(window->hwnd, CreateRectRgnIndirect(&window->rgn), TRUE);
 }
 
-static void handle_nccreate(HWND window, CREATESTRUCTW *cs)
+static void handle_nccreate(HWND hwnd, CREATESTRUCTW *cs)
 {
-	struct window *data = (struct window*)cs->lpCreateParams;
-	SetWindowLongPtrW(window, GWLP_USERDATA, (LONG_PTR)data);
+	borderless_window_t *window = (borderless_window_t*)cs->lpCreateParams;
+	SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)window);
 }
 
-static void handle_compositionchanged(struct window *data)
+static void handle_compositionchanged(borderless_window_t *window)
 {
 	BOOL enabled = FALSE;
 	DwmIsCompositionEnabled(&enabled);
-	data->composition_enabled = enabled == TRUE;
+	window->composition_enabled = enabled == TRUE;
 
 	if (enabled) {
 		/* The window needs a frame to show a shadow, so give it the smallest
 		   amount of frame possible */
 		MARGINS m = {0};
 		m.cyTopHeight = 1;
-		DwmExtendFrameIntoClientArea(data->hwnd, &m);
+		DwmExtendFrameIntoClientArea(window->hwnd, &m);
 		DWORD state = DWMNCRP_ENABLED;
-		DwmSetWindowAttribute(data->hwnd, DWMWA_NCRENDERING_POLICY, &state, sizeof(DWORD));
+		DwmSetWindowAttribute(window->hwnd, DWMWA_NCRENDERING_POLICY, &state, sizeof(DWORD));
 	}
 
-	update_region(data);
+	update_region(window);
 }
 
 static bool has_autohide_appbar(UINT edge, RECT mon)
@@ -115,7 +115,7 @@ static bool has_autohide_appbar(UINT edge, RECT mon)
 	return SHAppBarMessage(ABM_GETAUTOHIDEBAR, &abd) == TRUE;
 }
 
-static void handle_nccalcsize(struct window *data, WPARAM wparam,
+static void handle_nccalcsize(borderless_window_t *window, WPARAM wparam,
                               LPARAM lparam)
 {
 	union {
@@ -126,13 +126,13 @@ static void handle_nccalcsize(struct window *data, WPARAM wparam,
 	/* DefWindowProc must be called in both the maximized and non-maximized
 	   cases, otherwise tile/cascade windows won't work */
 	RECT nonclient = *params.rect;
-	DefWindowProcW(data->hwnd, WM_NCCALCSIZE, wparam, params.lparam);
+	DefWindowProcW(window->hwnd, WM_NCCALCSIZE, wparam, params.lparam);
 	RECT client = *params.rect;
 
-	if (IsMaximized(data->hwnd)) {
+	if (IsMaximized(window->hwnd)) {
 		WINDOWINFO wi = {0};
 		wi.cbSize = sizeof(wi);
-		GetWindowInfo(data->hwnd, &wi);
+		GetWindowInfo(window->hwnd, &wi);
 
 		/* Maximized windows always have a non-client border that hangs over
 		   the edge of the screen, so the size proposed by WM_NCCALCSIZE is
@@ -144,7 +144,7 @@ static void handle_nccalcsize(struct window *data, WPARAM wparam,
 		r.bottom = client.bottom;
 		*params.rect = r;
 
-		HMONITOR mon = MonitorFromWindow(data->hwnd, MONITOR_DEFAULTTOPRIMARY);
+		HMONITOR mon = MonitorFromWindow(window->hwnd, MONITOR_DEFAULTTOPRIMARY);
 		MONITORINFO mi = {0};
 		mi.cbSize = sizeof(mi);
 		GetMonitorInfoW(mon, &mi);
@@ -174,13 +174,13 @@ static void handle_nccalcsize(struct window *data, WPARAM wparam,
 	}
 }
 
-static LRESULT handle_nchittest(struct window *data, int x, int y)
+static LRESULT handle_nchittest(borderless_window_t *window, int x, int y)
 {
-	if (IsMaximized(data->hwnd))
+	if (IsMaximized(window->hwnd))
 		return HTCLIENT;
 
 	POINT mouse = { x, y };
-	ScreenToClient(data->hwnd, &mouse);
+	ScreenToClient(window->hwnd, &mouse);
 
 	/* The horizontal frame should be the same size as the vertical frame,
 	   since the NONCLIENTMETRICS structure does not distinguish between them */
@@ -191,59 +191,59 @@ static LRESULT handle_nchittest(struct window *data, int x, int y)
 	if (mouse.y < frame_size) {
 		if (mouse.x < diagonal_width)
 			return HTTOPLEFT;
-		if (mouse.x >= (int)data->width - diagonal_width)
+		if (mouse.x >= (int)window->width - diagonal_width)
 			return HTTOPRIGHT;
 		return HTTOP;
 	}
 
-	if (mouse.y >= (int)data->height - frame_size) {
+	if (mouse.y >= (int)window->height - frame_size) {
 		if (mouse.x < diagonal_width)
 			return HTBOTTOMLEFT;
-		if (mouse.x >= (int)data->width - (int)diagonal_width)
+		if (mouse.x >= (int)window->width - (int)diagonal_width)
 			return HTBOTTOMRIGHT;
 		return HTBOTTOM;
 	}
 
 	if (mouse.x < frame_size)
 		return HTLEFT;
-	if (mouse.x >= (int)data->width - frame_size)
+	if (mouse.x >= (int)window->width - frame_size)
 		return HTRIGHT;
 	return HTCLIENT;
 }
 
-static void handle_themechanged(struct window *data)
+static void handle_themechanged(borderless_window_t *window)
 {
-	data->theme_enabled = IsThemeActive() == TRUE;
+	window->theme_enabled = IsThemeActive() == TRUE;
 }
 
-static void handle_windowposchanged(struct window *data, const WINDOWPOS *pos)
+static void handle_windowposchanged(borderless_window_t *window, const WINDOWPOS *pos)
 {
 	RECT client;
-	GetClientRect(data->hwnd, &client);
-	unsigned old_width = data->width;
-	unsigned old_height = data->height;
-	data->width = client.right;
-	data->height = client.bottom;
-	bool client_changed = data->width != old_width || data->height != old_height;
+	GetClientRect(window->hwnd, &client);
+	unsigned old_width = window->width;
+	unsigned old_height = window->height;
+	window->width = client.right;
+	window->height = client.bottom;
+	bool client_changed = window->width != old_width || window->height != old_height;
 
 	if (client_changed || (pos->flags & SWP_FRAMECHANGED))
-		update_region(data);
+		update_region(window);
 
 	if (client_changed) {
 		/* Invalidate the changed parts of the rectangle drawn in WM_PAINT */
-		if (data->width > old_width) {
+		if (window->width > old_width) {
 			RECT r = { (LONG)(old_width - 1), (LONG)0, (LONG)old_width, (LONG)old_height };
-			InvalidateRect(data->hwnd, &r, TRUE);
+			InvalidateRect(window->hwnd, &r, TRUE);
 		} else {
-			RECT r = { (LONG)(data->width - 1), (LONG)0, (LONG)data->width, (LONG)data->height };
-			InvalidateRect(data->hwnd, &r, TRUE);
+			RECT r = { (LONG)(window->width - 1), (LONG)0, (LONG)window->width, (LONG)window->height };
+			InvalidateRect(window->hwnd, &r, TRUE);
 		}
-		if (data->height > old_height) {
+		if (window->height > old_height) {
 			RECT r = { (LONG)0, (LONG)(old_height - 1), (LONG)old_width, (LONG)old_height };
-			InvalidateRect(data->hwnd, &r, TRUE);
+			InvalidateRect(window->hwnd, &r, TRUE);
 		} else {
-			RECT r = { (LONG)0, (LONG)(data->height - 1), (LONG)data->width, (LONG)data->height };
-			InvalidateRect(data->hwnd, &r, TRUE);
+			RECT r = { (LONG)0, (LONG)(window->height - 1), (LONG)window->width, (LONG)window->height };
+			InvalidateRect(window->hwnd, &r, TRUE);
 		}
 	}
 }
@@ -262,41 +262,37 @@ static LRESULT handle_message_invisible(HWND window, UINT msg, WPARAM wparam, LP
 	return result;
 }
 
-static LRESULT CALLBACK borderless_window_proc(HWND window, UINT msg, WPARAM wparam, LPARAM lparam)
+static LRESULT CALLBACK borderless_window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
-	struct window *data = (struct window*)GetWindowLongPtrW(window, GWLP_USERDATA);
-	if (!data) {
+	borderless_window_t *window = (borderless_window_t*)GetWindowLongPtrW(hwnd, GWLP_USERDATA);
+	if (!window) {
 		/* Due to a longstanding Windows bug, overlapped windows will receive a
 		   WM_GETMINMAXINFO message before WM_NCCREATE. This is safe to ignore.
 		   It doesn't need any special handling anyway. */
 		if (msg == WM_NCCREATE)
-			handle_nccreate(window, (CREATESTRUCTW*)lparam);
-		return DefWindowProcW(window, msg, wparam, lparam);
+			handle_nccreate(hwnd, (CREATESTRUCTW*)lparam);
+		return DefWindowProcW(hwnd, msg, wparam, lparam);
 	}
 
+	static bool painting = false;
+
 	switch (msg) {
-	case WM_CLOSE:
-		DestroyWindow(window);
-		return 0;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		return 0;
 	case WM_DWMCOMPOSITIONCHANGED:
-		handle_compositionchanged(data);
+		handle_compositionchanged(window);
 		return 0;
 	case WM_NCACTIVATE:
 		/* DefWindowProc won't repaint the window border if lParam (normally a HRGN) is -1. This is recommended in:
 		   https://blogs.msdn.microsoft.com/wpfsdk/2008/09/08/custom-window-chrome-in-wpf/ */
-		return DefWindowProcW(window, msg, wparam, -1);
+		return DefWindowProcW(hwnd, msg, wparam, -1);
 	case WM_NCCALCSIZE:
-		handle_nccalcsize(data, wparam, lparam);
+		handle_nccalcsize(window, wparam, lparam);
 		return 0;
 	case WM_NCHITTEST:
-		return handle_nchittest(data, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
+		return handle_nchittest(window, GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam));
 	case WM_NCPAINT:
 		/* Only block WM_NCPAINT when composition is disabled. If it's blocked
 		   when composition is enabled, the window shadow won't be drawn. */
-		if (!data->composition_enabled)
+		if (!window->composition_enabled)
 			return 0;
 		break;
 	case WM_NCUAHDRAWCAPTION:
@@ -304,6 +300,11 @@ static LRESULT CALLBACK borderless_window_proc(HWND window, UINT msg, WPARAM wpa
 		/* These undocumented messages are sent to draw themed window borders.
 		   Block them to prevent drawing borders over the client area. */
 		return 0;
+	case WM_PAINT:
+		if (painting)
+			return DefWindowProcW(hwnd, msg, wparam, lparam);
+		painting = true;
+		break;
 	case WM_SETICON:
 	case WM_SETTEXT:
 		/* Disable painting while these messages are handled to prevent them
@@ -311,25 +312,33 @@ static LRESULT CALLBACK borderless_window_proc(HWND window, UINT msg, WPARAM wpa
 		   composition and theming are disabled. These messages don't paint
 		   when composition is enabled and blocking WM_NCUAHDRAWCAPTION should
 		   be enough to prevent painting when theming is enabled. */
-		if (!data->composition_enabled && !data->theme_enabled)
-			return handle_message_invisible(window, msg, wparam, lparam);
+		if (!window->composition_enabled && !window->theme_enabled)
+			return handle_message_invisible(hwnd, msg, wparam, lparam);
 		break;
 	case WM_SIZE:
-		data->minimized = wparam == SIZE_MINIMIZED;
-		data->maximized = wparam == SIZE_MAXIMIZED;
+		window->minimized = wparam == SIZE_MINIMIZED;
+		window->maximized = wparam == SIZE_MAXIMIZED;
 		return 0;
 	case WM_THEMECHANGED:
-		handle_themechanged(data);
+		handle_themechanged(window);
 		break;
 	case WM_WINDOWPOSCHANGED:
-		handle_windowposchanged(data, (WINDOWPOS*)lparam);
-		return DefWindowProcW(window, msg, wparam, lparam); // Must be executed so that WM_SIZE and WM_MOVE get sent properly!
+		handle_windowposchanged(window, (WINDOWPOS*)lparam);
+		return DefWindowProcW(hwnd, msg, wparam, lparam); // Must be executed so that WM_SIZE and WM_MOVE get sent properly!
 	}
 
-	if (data->handler(data, msg, wparam, lparam))
-		return 0;
+	LRESULT result = window->handler(window, msg, wparam, lparam) ? 0 : DefWindowProcW(hwnd, msg, wparam, lparam);
 
-	return DefWindowProcW(window, msg, wparam, lparam);
+	if (msg == WM_PAINT)
+		painting = false;
+	else if (msg == WM_CLOSE || msg == WM_QUIT)
+	{
+		DestroyWindow(hwnd);
+		free(window);
+		return 0;
+	}
+
+	return result;
 }
 
 void borderless_window_register()
@@ -350,22 +359,22 @@ void borderless_window_unregister()
 	UnregisterClassW(L"borderless-window", GetModuleHandle(NULL));
 }
 
-struct window* borderless_window_create(LPCWSTR title, int width, int height, message_handler handler, void* userdata)
+borderless_window_t* borderless_window_create(LPCWSTR title, int width, int height, message_handler handler, void* userdata)
 {
-	struct window *data = (struct window*)calloc(1, sizeof(struct window));
+	borderless_window_t *window = (borderless_window_t*)calloc(1, sizeof(borderless_window_t));
 
-	data->handler = handler;
-	data->userdata = userdata;
+	window->handler = handler;
+	window->userdata = userdata;
 
-	data->hwnd = CreateWindowExW(
+	window->hwnd = CreateWindowExW(
 		WS_EX_APPWINDOW | WS_EX_LAYERED,
 		L"borderless-window",
 		title,
 		WS_OVERLAPPEDWINDOW | WS_SIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT, width, height,
-		NULL, NULL, GetModuleHandle(NULL), data);
+		NULL, NULL, GetModuleHandle(NULL), window);
 	
-	data->hdc = GetDC(data->hwnd);
+	window->hdc = GetDC(window->hwnd);
 
 	/* Make the window a layered window so the legacy GDI API can be used to
 	   draw to it without messing up the area on top of the DWM frame. Note:
@@ -373,16 +382,21 @@ struct window* borderless_window_create(LPCWSTR title, int width, int height, me
 	   Direct2D, Direct3D, DirectComposition, etc. */
 	
 	// Apparently it actually is necessary if you want compositing to work properly with alpha blending!?
-	SetLayeredWindowAttributes(data->hwnd, RGB(255, 255, 255), 255, LWA_COLORKEY);
+	SetLayeredWindowAttributes(window->hwnd, RGB(255, 255, 255), 255, LWA_COLORKEY);
 
-	handle_compositionchanged(data);
-	handle_themechanged(data);
+	handle_compositionchanged(window);
+	handle_themechanged(window);
 
-	return data;
+	return window;
 }
 
-void borderless_window_destroy(struct window* data)
+static BOOL CALLBACK enum_thread_window(HWND hwnd, LPARAM /*lParam*/)
 {
-	DestroyWindow(data->hwnd);
-	free(data);
+	PostMessage(hwnd, WM_CLOSE, 0, 0);
+	return TRUE;
+}
+
+void borderless_window_close_all(borderless_window_t* root)
+{
+	EnumThreadWindows(GetWindowThreadProcessId(root->hwnd, 0), enum_thread_window, NULL);
 }

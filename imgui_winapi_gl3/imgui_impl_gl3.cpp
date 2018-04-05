@@ -306,10 +306,15 @@ bool ImGui_Impl_WinAPI_GL3_Init()
 	io.SetClipboardTextFn = ImGui_Impl_WinAPI_GL3_SetClipboardText;
 	io.GetClipboardTextFn = ImGui_Impl_WinAPI_GL3_GetClipboardText;
 
-	LARGE_INTEGER qpf;
-	QueryPerformanceFrequency(&qpf);
-	g_RcpQueryPerformanceFrequency = 1.0 / (double)qpf.QuadPart;
-	QueryPerformanceCounter(&g_QueryPerformanceCounterStart);
+	if (g_RcpQueryPerformanceFrequency == 0.0)
+	{
+		LARGE_INTEGER qpf;
+		QueryPerformanceFrequency(&qpf);
+		g_RcpQueryPerformanceFrequency = 1.0 / (double)qpf.QuadPart;
+	}
+
+	if (g_QueryPerformanceCounterStart.QuadPart == 0)
+		QueryPerformanceCounter(&g_QueryPerformanceCounterStart);
 
 	return true;
 }

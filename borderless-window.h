@@ -1,8 +1,10 @@
 #pragma once
 
-typedef bool (*message_handler)(struct window *data, UINT msg, WPARAM wparam, LPARAM lparam);
+struct borderless_window_t;
 
-struct window
+typedef bool (*message_handler)(borderless_window_t *data, UINT msg, WPARAM wparam, LPARAM lparam);
+
+struct borderless_window_t
 {
 	HWND hwnd;
 	HDC hdc;
@@ -24,5 +26,5 @@ struct window
 void borderless_window_register();
 void borderless_window_unregister();
 
-struct window* borderless_window_create(LPCWSTR title, int width, int height, message_handler handler, void* userdata);
-void borderless_window_destroy(struct window* data);
+borderless_window_t* borderless_window_create(LPCWSTR title, int width, int height, message_handler handler, void* userdata);
+void borderless_window_close_all(borderless_window_t* root);
