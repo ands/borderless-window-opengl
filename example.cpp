@@ -38,7 +38,7 @@ static void imgui_window1(borderless_window_t * window, void * /*userdata*/)
 
 int CALLBACK wWinMain(HINSTANCE /*inst*/, HINSTANCE /*prev*/, LPWSTR /*cmd*/, int /*show*/)
 {
-	imgui_window_init();
+	imgui_window_init(3, 1);
 	imgui_window_create(L"Hello", 1280, 800, imgui_window0, NULL);
 	imgui_window_create(L"World",  640, 480, imgui_window1, NULL);
 	int result = imgui_window_message_loop();

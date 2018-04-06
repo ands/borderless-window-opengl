@@ -64,7 +64,7 @@ bool opengl_set_pixelformat(HDC hdc)
 	return true;
 }
 
-HGLRC opengl_create_context(HDC hdc)
+HGLRC opengl_create_context(HDC hdc, int version_major, int version_minor)
 {
 	WNDCLASSA wc = {0};
 	wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
@@ -113,8 +113,8 @@ HGLRC opengl_create_context(HDC hdc)
 		return NULL;
 
 	int gl_attribs[] = {
-		WGL_CONTEXT_MAJOR_VERSION_ARB, 4,
-		WGL_CONTEXT_MINOR_VERSION_ARB, 6,
+		WGL_CONTEXT_MAJOR_VERSION_ARB, version_major,
+		WGL_CONTEXT_MINOR_VERSION_ARB, version_minor,
 		WGL_CONTEXT_PROFILE_MASK_ARB,  WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
 		0,
 	};

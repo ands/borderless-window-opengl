@@ -1,3 +1,5 @@
+static int g_openglMajorVersion;
+static int g_openglMinorVersion;
 static HGLRC hglrc; // Global, shared between windows
 
 struct imgui_window_t;
@@ -73,7 +75,7 @@ borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_win
 
 	if (!hglrc)
 	{
-		if (!(hglrc = opengl_create_context(window->hdc)))
+		if (!(hglrc = opengl_create_context(window->hdc, g_openglMajorVersion, g_openglMinorVersion)))
 			ExitProcess(ERROR_INVALID_HANDLE);
 		gladLoadGL();
 	}
@@ -98,8 +100,10 @@ borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_win
 	return window;
 }
 
-void imgui_window_init()
+void imgui_window_init(int openglMajorVersion, int openglMinorVersion)
 {
+	g_openglMajorVersion = openglMajorVersion;
+	g_openglMinorVersion = openglMinorVersion;
 	borderless_window_register();
 }
 
