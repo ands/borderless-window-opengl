@@ -32,6 +32,8 @@ static void imgui_window1(borderless_window_t * window, void * /*userdata*/)
 
 	if (ImGui::Button("Destroy Window"))
 		PostMessage(window->hwnd, WM_CLOSE, 0, 0);
+	
+	ImGui::Text(window->maximized ? "Maximized" : "Regular");
 
 	imgui_window_end();
 }

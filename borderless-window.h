@@ -12,11 +12,8 @@ struct borderless_window_t
 	unsigned width;
 	unsigned height;
 
-	RECT rgn;
-
 	bool minimized;
 	bool maximized;
-	bool theme_enabled;
 	bool composition_enabled;
 
 	message_handler handler;

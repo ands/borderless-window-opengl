@@ -57,13 +57,6 @@ static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, 
 	return ImGui_Impl_WinAPI_GL3_Handle_Message(window->hwnd, msg, wparam, lparam);
 }
 
-static BOOL CALLBACK imgui_enum_thread_window(HWND hwnd, LPARAM lParam)
-{
-	if (hwnd != (HWND)lParam)
-		UpdateWindow(hwnd);
-	return TRUE;
-}
-
 borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_window_func func, void *userdata)
 {
 	ImGuiContext* previous = ImGui::GetCurrentContext();
@@ -92,8 +85,6 @@ borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_win
 
 	ShowWindow(window->hwnd, SW_SHOWDEFAULT);
 	UpdateWindow(window->hwnd);
-
-	EnumThreadWindows(GetWindowThreadProcessId(window->hwnd, 0), imgui_enum_thread_window, (LPARAM)window->hwnd);
 
 	ImGui::SetCurrentContext(previous);
 
