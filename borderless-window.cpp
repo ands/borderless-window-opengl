@@ -120,7 +120,7 @@ static LRESULT CALLBACK borderless_window_proc(HWND hwnd, UINT msg, WPARAM wpara
 	{
 		if (msg == WM_NCCREATE)
 		{
-			borderless_window_t *window = (borderless_window_t*)((CREATESTRUCTW*)lparam)->lpCreateParams;
+			window = (borderless_window_t*)((CREATESTRUCTW*)lparam)->lpCreateParams;
 			SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR)window);
 		}
 		return DefWindowProcW(hwnd, msg, wparam, lparam);
