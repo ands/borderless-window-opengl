@@ -5,5 +5,3 @@ Demonstration of alpha blended compositing of opengl contexts via borderless win
 Based on https://github.com/rossy/borderless-window and https://github.com/ocornut/imgui .
 
 ![ImGui alpha blended onto a Windows desktop](https://github.com/ands/borderless-window-opengl/raw/master/screenshots/imgui_with_alpha_on_win32.png)
-
-The application only creates an OpenGL 2 context, because creating a modern context is a PITA and out of scope here.
