@@ -22,16 +22,13 @@ static void imgui_window0(borderless_window_t *window, void * /*userdata*/)
 static void imgui_window1(borderless_window_t * window, void * /*userdata*/)
 {
 	if (!imgui_window_begin("Imgui!"))
-		PostMessage(window->hwnd, WM_CLOSE, 0, 0);
+		borderless_window_close(window);
 
 	if (ImGui::Button("Create Window"))
-	{
 		imgui_window_create(L"Foobar", 256, 256, imgui_window1, NULL);
-		UpdateWindow(window->hwnd);
-	}
 
 	if (ImGui::Button("Destroy Window"))
-		PostMessage(window->hwnd, WM_CLOSE, 0, 0);
+		borderless_window_close(window);
 	
 	ImGui::Text(window->maximized ? "Maximized" : "Regular");
 
