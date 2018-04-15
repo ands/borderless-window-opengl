@@ -131,6 +131,29 @@ static LRESULT CALLBACK borderless_window_proc(HWND hwnd, UINT msg, WPARAM wpara
 		window->width = LOWORD(lparam);
 		window->height = HIWORD(lparam);
 		return 0;
+	case WM_KEYUP:
+		// Emulate windows tiling feature triggered via key combo (only works on primary monitor for now):
+		// TODO: Handle multiple monitors!
+		// TODO: Do the same when hitting a monitor edge while dragging!
+		if (((GetKeyState(VK_LWIN) & 0x8000) != 0 ||
+			 (GetKeyState(VK_RWIN) & 0x8000) != 0) &&
+			 (wparam == VK_LEFT ||
+			 wparam == VK_RIGHT ||
+			 wparam == VK_DOWN))
+		{
+			RECT r = {};
+			SystemParametersInfo(SPI_GETWORKAREA, 0, &r, 0);
+			int w = r.right - r.left;
+			int h = r.bottom - r.top;
+			
+			if (wparam == VK_LEFT)
+				SetWindowPos(hwnd, HWND_TOP, r.left, r.top, w / 2, h, NULL);
+			if (wparam == VK_RIGHT)
+				SetWindowPos(hwnd, HWND_TOP, r.left + w / 2, r.top, w / 2, h, NULL);
+			if (wparam == VK_DOWN)
+				ShowWindow(hwnd, SW_RESTORE);
+		}
+		break;
 	}
 
 	LRESULT result = window->handler(window, msg, wparam, lparam) ? 0 : DefWindowProcW(hwnd, msg, wparam, lparam);
