@@ -113,9 +113,7 @@ static LRESULT CALLBACK borderless_window_proc(HWND hwnd, UINT msg, WPARAM wpara
 
 		if (window->maximized && (window->width != LOWORD(lparam) || window->height != HIWORD(lparam)))
 		{
-			const POINT zero = { 0, 0 };
 			HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-
 			MONITORINFO monitorInfo = {};
 			monitorInfo.cbSize = sizeof(monitorInfo);
 			if (GetMonitorInfo(monitor, &monitorInfo))
