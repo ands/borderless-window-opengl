@@ -114,13 +114,13 @@ static LRESULT CALLBACK borderless_window_proc(HWND hwnd, UINT msg, WPARAM wpara
 		if (window->maximized && (window->width != LOWORD(lparam) || window->height != HIWORD(lparam)))
 		{
 			const POINT zero = { 0, 0 };
-			HMONITOR primary = MonitorFromPoint (zero, MONITOR_DEFAULTTOPRIMARY);
 			HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-			
-			if (monitor == primary)
+
+			MONITORINFO monitorInfo = {};
+			monitorInfo.cbSize = sizeof(monitorInfo);
+			if (GetMonitorInfo(monitor, &monitorInfo))
 			{
-				RECT r = {};
-				SystemParametersInfo(SPI_GETWORKAREA, 0, &r, 0);
+				RECT &r = monitorInfo.rcWork;
 				window->width = r.right - r.left;
 				window->height = r.bottom - r.top;
 				SetWindowPos(hwnd, HWND_TOP, r.left, r.top, window->width, window->height, NULL);
