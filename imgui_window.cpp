@@ -1,16 +1,24 @@
+#define WIN32_LEAN_AND_MEAN
+#define VC_EXTRALEAN
+#include "windows.h"
+#include <malloc.h>
+#include "borderless-window.h"
+#include "glad.h"
+#include "opengl_context.h"
+#include "imgui.h"
+#include "imgui_impl_gl3.h"
+#include "imgui_window.h"
+
 static int g_openglMajorVersion;
 static int g_openglMinorVersion;
 static HGLRC g_hglrc; // Global, shared between windows
 static int g_windowIdCounter = 0; // Helps during debugging
 
-struct imgui_window_t;
-
-typedef void (*imgui_window_func)(borderless_window_t *window, void *userdata);
-
 struct imgui_window_t
 {
 	ImGuiContext *context;
-	imgui_window_func func;
+	imgui_window_func draw;
+	imgui_window_func close;
 	void *userdata;
 	int id;
 };
@@ -41,8 +49,9 @@ static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, 
 		ImGui_Impl_WinAPI_GL3_NewFrame(window->hwnd, window->width, window->height, window->width, window->height);
 		ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
 		ImGui::SetNextWindowSize(ImVec2((float)window->width, (float)window->height));
-		imgui->func(window, imgui->userdata);
+		imgui->draw(window, imgui->userdata);
 		glViewport(0, 0, window->width, window->height);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 		ImGui::Render();
 		ImGui_Impl_WinAPI_GL3_RenderDrawData(ImGui::GetDrawData());
@@ -51,6 +60,8 @@ static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, 
 	}
 	if (msg == WM_CLOSE || msg == WM_QUIT)
 	{
+		if (imgui->close)
+			imgui->close(window, imgui->userdata);
 		ImGui_Impl_WinAPI_GL3_Shutdown();
 		ImGui::DestroyContext();
 		free(imgui);
@@ -60,13 +71,14 @@ static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, 
 	return ImGui_Impl_WinAPI_GL3_Handle_Message(window->hwnd, msg, wparam, lparam);
 }
 
-borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_window_func func, void *userdata)
+borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_window_func draw, imgui_window_func close, void *userdata)
 {
 	ImGuiContext* previous = ImGui::GetCurrentContext();
 	HDC previousDC = wglGetCurrentDC();
 
 	imgui_window_t *imgui = (imgui_window_t*)calloc(1, sizeof(imgui_window_t));
-	imgui->func = func;
+	imgui->draw = draw;
+	imgui->close = close;
 	imgui->userdata = userdata;
 	imgui->id = g_windowIdCounter++;
 	borderless_window_t* window = borderless_window_create(title, w, h, imgui_message, imgui);
