@@ -9,5 +9,5 @@ borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_win
 int imgui_window_message_loop();
 void imgui_window_shutdown();
 
-bool imgui_window_begin(const char *title);
+bool imgui_window_begin(const char *title, ImGuiWindowFlags flags = 0);
 void imgui_window_end();

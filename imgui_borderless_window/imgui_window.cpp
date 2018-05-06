@@ -23,10 +23,10 @@ struct imgui_window_t
 	int id;
 };
 
-bool imgui_window_begin(const char *title)
+bool imgui_window_begin(const char *title, ImGuiWindowFlags flags)
 {
 	bool show = true;
-	return ImGui::Begin(title, &show, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse) && show;
+	return ImGui::Begin(title, &show, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | flags) && show;
 }
 void imgui_window_end()
 {
