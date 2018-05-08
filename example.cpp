@@ -1,21 +1,18 @@
-#include <windows.h>
-#include "borderless-window.h"
-#include "glad.h"
 #include "imgui.h"
 #include "imgui_window.h"
 
 // Style Editor Window
-static void imgui_style_editor_draw(borderless_window_t *window, void * /*userdata*/)
+static void imgui_style_editor_draw(imgui_window_t *window, void * /*userdata*/)
 {
 	if (!imgui_window_begin("Style Editor"))
-		borderless_window_close(window);
+		imgui_window_close(window);
 	ImGui::ShowStyleEditor();
 	imgui_window_end();
 }
-static void imgui_style_editor_close(borderless_window_t *window, void * /*userdata*/)
+static void imgui_style_editor_close(imgui_window_t *window, void * /*userdata*/)
 {
-	borderless_window_close_all(window);
-	PostQuitMessage(0);
+	imgui_window_close_all(window);
+	imgui_window_quit();
 }
 static void imgui_style_editor_create()
 {
@@ -24,10 +21,10 @@ static void imgui_style_editor_create()
 
 // Self-Replicating Test Window
 static void imgui_test_create();
-static void imgui_test_draw(borderless_window_t *window, void * /*userdata*/)
+static void imgui_test_draw(imgui_window_t *window, void * /*userdata*/)
 {
 	if (!imgui_window_begin("Imgui!"))
-		borderless_window_close(window);
+		imgui_window_close(window);
 
 	if (ImGui::Button("Create Window"))
 		imgui_test_create();
@@ -43,8 +40,8 @@ static void imgui_test_create()
 	imgui_window_create(L"World", 640, 480, imgui_test_draw, NULL, NULL);
 }
 
-// Main
-int CALLBACK wWinMain(HINSTANCE /*inst*/, HINSTANCE /*prev*/, LPWSTR /*cmd*/, int /*show*/)
+
+int __stdcall wWinMain(void*, void*, wchar_t*, int)
 {
 	imgui_window_init(3, 1);
 	imgui_style_editor_create();

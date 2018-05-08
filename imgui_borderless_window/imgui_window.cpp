@@ -2,7 +2,7 @@
 #define VC_EXTRALEAN
 #include "windows.h"
 #include <malloc.h>
-#include "borderless-window.h"
+#include "borderless_window.h"
 #include "glad.h"
 #include "opengl_context.h"
 #include "imgui.h"
@@ -14,7 +14,7 @@ static int g_openglMinorVersion;
 static HGLRC g_hglrc; // Global, shared between windows
 static int g_windowIdCounter = 0; // Helps during debugging
 
-struct imgui_window_t
+struct imgui_context_t
 {
 	ImGuiContext *context;
 	imgui_window_func draw;
@@ -33,20 +33,20 @@ void imgui_window_end()
 	ImGui::End();
 }
 
-static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, LPARAM lparam)
+static bool imgui_message(imgui_window_t *window, unsigned int msg, unsigned __int64 wparam, unsigned __int64 lparam)
 {
-	imgui_window_t *imgui = (imgui_window_t*)window->userdata;
+	imgui_context_t *imgui = (imgui_context_t*)window->userdata;
 	ImGui::SetCurrentContext(imgui->context);
 	
 	if (HIWORD(lparam) < 19 && LOWORD(lparam) < window->width - 17) // TODO: Get title bar dimensions from imgui
 	{
-		if (msg == WM_LBUTTONDOWN  ) { SendMessageW(window->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);             return true; } // Drag window
-		if (msg == WM_LBUTTONDBLCLK) { ShowWindow(window->hwnd, window->maximized ? SW_RESTORE : SW_MAXIMIZE); return true; } // Toggle maximize
+		if (msg == WM_LBUTTONDOWN  ) { SendMessageW((HWND)window->hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);             return true; } // Drag window
+		if (msg == WM_LBUTTONDBLCLK) { ShowWindow((HWND)window->hwnd, window->maximized ? SW_RESTORE : SW_MAXIMIZE); return true; } // Toggle maximize
 	}
 	if (msg == WM_PAINT)
 	{
-		wglMakeCurrent(window->hdc, g_hglrc);
-		ImGui_Impl_WinAPI_GL3_NewFrame(window->hwnd, window->width, window->height, window->width, window->height);
+		wglMakeCurrent((HDC)window->hdc, g_hglrc);
+		ImGui_Impl_WinAPI_GL3_NewFrame((HWND)window->hwnd, window->width, window->height, window->width, window->height);
 		ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f));
 		ImGui::SetNextWindowSize(ImVec2((float)window->width, (float)window->height));
 		imgui->draw(window, imgui->userdata);
@@ -55,7 +55,7 @@ static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, 
 		glClear(GL_COLOR_BUFFER_BIT);
 		ImGui::Render();
 		ImGui_Impl_WinAPI_GL3_RenderDrawData(ImGui::GetDrawData());
-		SwapBuffers(window->hdc);
+		SwapBuffers((HDC)window->hdc);
 		return true;
 	}
 	if (msg == WM_CLOSE || msg == WM_QUIT)
@@ -68,40 +68,40 @@ static bool imgui_message(borderless_window_t *window, UINT msg, WPARAM wparam, 
 		return true;
 	}
 	
-	return ImGui_Impl_WinAPI_GL3_Handle_Message(window->hwnd, msg, wparam, lparam);
+	return ImGui_Impl_WinAPI_GL3_Handle_Message((HWND)window->hwnd, msg, wparam, lparam);
 }
 
-borderless_window_t * imgui_window_create(LPCWSTR title, int w, int h, imgui_window_func draw, imgui_window_func close, void *userdata)
+imgui_window_t *imgui_window_create(const wchar_t *title, int w, int h, imgui_window_func draw, imgui_window_func close, void *userdata)
 {
 	ImGuiContext* previous = ImGui::GetCurrentContext();
 	HDC previousDC = wglGetCurrentDC();
 
-	imgui_window_t *imgui = (imgui_window_t*)calloc(1, sizeof(imgui_window_t));
+	imgui_context_t *imgui = (imgui_context_t*)calloc(1, sizeof(imgui_context_t));
 	imgui->draw = draw;
 	imgui->close = close;
 	imgui->userdata = userdata;
 	imgui->id = g_windowIdCounter++;
-	borderless_window_t* window = borderless_window_create(title, w, h, imgui_message, imgui);
+	imgui_window_t* window = borderless_window_create(title, w, h, imgui_message, imgui);
 
 	if (!g_hglrc)
 	{
-		if (!(g_hglrc = opengl_create_context(window->hdc, g_openglMajorVersion, g_openglMinorVersion)))
+		if (!(g_hglrc = opengl_create_context((HDC)window->hdc, g_openglMajorVersion, g_openglMinorVersion)))
 			ExitProcess(ERROR_INVALID_HANDLE);
 		gladLoadGL();
 	}
 	else
 	{
-		if (!opengl_set_pixelformat(window->hdc))
+		if (!opengl_set_pixelformat((HDC)window->hdc))
 			ExitProcess(ERROR_INVALID_HANDLE);
 	}
 
-	ImGui::SetCurrentContext((ImGuiContext*)(((imgui_window_t*)window->userdata)->context = ImGui::CreateContext()));
+	ImGui::SetCurrentContext((ImGuiContext*)(((imgui_context_t*)window->userdata)->context = ImGui::CreateContext()));
 	ImGui_Impl_WinAPI_GL3_Init();
 	ImGui::StyleColorsDark();
 	ImGui::GetStyle().WindowRounding = 0.0f; // Try to hide remaining 1px row of windows border in the corners which needs to be there to not get other artifacts :(
 
-	ShowWindow(window->hwnd, SW_SHOWDEFAULT);
-	UpdateWindow(window->hwnd);
+	ShowWindow((HWND)window->hwnd, SW_SHOWDEFAULT);
+	UpdateWindow((HWND)window->hwnd);
 
 	if (previousDC)
 		wglMakeCurrent(previousDC, g_hglrc);
@@ -133,4 +133,19 @@ int imgui_window_message_loop()
 		DispatchMessageW(&message);
 	}
 	return (int)message.wParam;
+}
+
+void imgui_window_close_all(imgui_window_t *root)
+{
+	borderless_window_close_all(root);
+}
+
+void imgui_window_close(imgui_window_t *window)
+{
+	borderless_window_close(window);
+}
+
+void imgui_window_quit()
+{
+	borderless_window_quit();
 }

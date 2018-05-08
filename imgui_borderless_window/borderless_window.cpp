@@ -16,7 +16,7 @@
 #include <windowsx.h>
 #include <dwmapi.h>
 #include <malloc.h>
-#include "borderless-window.h"
+#include "borderless_window.h"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
@@ -32,19 +32,19 @@ static void handle_compositionchanged(borderless_window_t *window)
 	{
 		MARGINS m = {0};
 		m.cyTopHeight = 1;
-		DwmExtendFrameIntoClientArea(window->hwnd, &m);
+		DwmExtendFrameIntoClientArea((HWND)window->hwnd, &m);
 		DWORD state = DWMNCRP_ENABLED;
-		DwmSetWindowAttribute(window->hwnd, DWMWA_NCRENDERING_POLICY, &state, sizeof(DWORD));
+		DwmSetWindowAttribute((HWND)window->hwnd, DWMWA_NCRENDERING_POLICY, &state, sizeof(DWORD));
 	}
 }
 
 static LRESULT handle_nchittest(borderless_window_t *window, int x, int y)
 {
-	if (IsMaximized(window->hwnd))
+	if (IsMaximized((HWND)window->hwnd))
 		return HTCLIENT;
 
 	POINT mouse = { x, y };
-	ScreenToClient(window->hwnd, &mouse);
+	ScreenToClient((HWND)window->hwnd, &mouse);
 
 	/* The horizontal frame should be the same size as the vertical frame,
 	   since the NONCLIENTMETRICS structure does not distinguish between them */
@@ -186,7 +186,7 @@ void borderless_window_unregister()
 	UnregisterClassW(L"borderless-window", GetModuleHandle(NULL));
 }
 
-borderless_window_t* borderless_window_create(LPCWSTR title, int width, int height, message_handler handler, void* userdata)
+borderless_window_t *borderless_window_create(const wchar_t *title, int width, int height, message_handler handler, void* userdata)
 {
 	borderless_window_t *window = (borderless_window_t*)calloc(1, sizeof(borderless_window_t));
 
@@ -202,7 +202,7 @@ borderless_window_t* borderless_window_create(LPCWSTR title, int width, int heig
 		NULL, NULL, GetModuleHandle(NULL), window);
 
 	// Necessary if you want compositing to work properly with alpha blending:
-	SetLayeredWindowAttributes(window->hwnd, RGB(255, 0, 255), 255, LWA_COLORKEY);
+	SetLayeredWindowAttributes((HWND)window->hwnd, RGB(255, 0, 255), 255, LWA_COLORKEY);
 
 	handle_compositionchanged(window);
 
@@ -217,10 +217,15 @@ static BOOL CALLBACK enum_thread_window(HWND hwnd, LPARAM /*lParam*/)
 
 void borderless_window_close_all(borderless_window_t *root)
 {
-	EnumThreadWindows(GetWindowThreadProcessId(root->hwnd, 0), enum_thread_window, NULL);
+	EnumThreadWindows(GetWindowThreadProcessId((HWND)root->hwnd, 0), enum_thread_window, NULL);
 }
 
 void borderless_window_close(borderless_window_t *window)
 {
-	PostMessage(window->hwnd, WM_CLOSE, 0, 0);
+	PostMessage((HWND)window->hwnd, WM_CLOSE, 0, 0);
+}
+
+void borderless_window_quit()
+{
+	PostQuitMessage(0);
 }
