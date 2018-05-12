@@ -124,13 +124,24 @@ void imgui_window_shutdown()
 	borderless_window_unregister();
 }
 
-int imgui_window_message_loop()
+static BOOL CALLBACK enum_thread_window_paint(HWND hwnd, LPARAM lParam)
+{
+	MSG *msg = (MSG*)lParam;
+	msg->hwnd = hwnd;
+	DispatchMessageW(msg);
+	return TRUE;
+}
+
+int imgui_window_message_loop(imgui_window_t *root)
 {
 	MSG message = {0};
 	while (GetMessageW(&message, NULL, 0, 0))
 	{
 		TranslateMessage(&message);
-		DispatchMessageW(&message);
+		if (message.message == WM_PAINT)
+			EnumThreadWindows(GetWindowThreadProcessId((HWND)root->hwnd, 0), enum_thread_window_paint, (LPARAM)&message);
+		else
+			DispatchMessageW(&message);
 	}
 	return (int)message.wParam;
 }

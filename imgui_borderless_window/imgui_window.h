@@ -5,7 +5,7 @@ typedef borderless_window_t imgui_window_t;
 
 // Main/Messageloop API:
 void imgui_window_init(int openglMajorVersion, int openglMinorVersion);
-int imgui_window_message_loop();
+int imgui_window_message_loop(imgui_window_t *root);
 void imgui_window_shutdown();
 
 // Window API:

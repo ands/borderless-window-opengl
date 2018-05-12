@@ -14,9 +14,9 @@ static void imgui_style_editor_close(imgui_window_t *window, void * /*userdata*/
 	imgui_window_close_all(window);
 	imgui_window_quit();
 }
-static void imgui_style_editor_create()
+static imgui_window_t *imgui_style_editor_create()
 {
-	imgui_window_create(L"Hello", 1280, 800, imgui_style_editor_draw, imgui_style_editor_close, NULL);
+	return imgui_window_create(L"Hello", 1280, 800, imgui_style_editor_draw, imgui_style_editor_close, NULL);
 }
 
 // Self-Replicating Test Window
@@ -44,9 +44,9 @@ static void imgui_test_create()
 int __stdcall wWinMain(void*, void*, wchar_t*, int)
 {
 	imgui_window_init(3, 1);
-	imgui_style_editor_create();
+	imgui_window_t *root = imgui_style_editor_create();
 	imgui_test_create();
-	int result = imgui_window_message_loop();
+	int result = imgui_window_message_loop(root);
 	imgui_window_shutdown();
 	return result;
 }
